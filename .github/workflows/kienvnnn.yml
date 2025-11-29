@@ -1,0 +1,149 @@
+name: 🚀 SEVER AI STV PREMIUM
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: '🕐 Thời gian sử dụng'
+        required: false
+        default: '5h40m'
+        type: choice
+        options:
+        - '1h'
+        - '3h'
+        - '5h40m'
+
+jobs:
+  Premium-RDP-Setup:
+    runs-on: windows-latest
+    timeout-minutes: 340
+
+    steps:
+      - name: 🎯 KHỞI ĐỘNG HỆ THỐNG
+        run: |
+          Write-Host ""
+          Write-Host ""
+          Write-Host "🤖 AI STV PREMIUM RDP SERVER" -ForegroundColor Yellow
+          Write-Host "⚡ Powered by AI STV" -ForegroundColor Green
+          Write-Host "🕒 Thời gian: ${{ github.event.inputs.duration }}" -ForegroundColor Magenta
+          Write-Host ""
+
+          $frames = @('⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷')
+          for($i=0; $i -lt 10; $i++) {
+              Write-Host "`r🚀 Đang khởi tạo hệ thống... $($frames[$i % 8])" -NoNewline -ForegroundColor Blue
+              Start-Sleep -Milliseconds 100
+          }
+          Write-Host "`r✅ Hệ thống đã sẵn sàng!                    " -ForegroundColor Green
+
+      - name: 🔧 CẤU HÌNH HỆ THỐNG
+        run: |
+          Write-Host ""
+          Write-Host "🛠️  ĐANG CẤU HÌNH HỆ THỐNG" -ForegroundColor Yellow
+
+          $steps = @(
+              @{Name="Bật Remote Desktop"; Script={
+                  Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+              }},
+              @{Name="Tắt xác thực mạng"; Script={
+                  Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+              }},
+              @{Name="Cấu hình bảo mật RDP"; Script={
+                  Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+              }},
+              @{Name="Mở port 3389 firewall"; Script={
+                  netsh advfirewall firewall add rule name="RDP-Premium" dir=in action=allow protocol=TCP localport=3389 profile=any
+              }},
+              @{Name="Khởi động dịch vụ"; Script={
+                  Set-Service -Name TermService -StartupType Automatic
+                  Start-Service -Name TermService
+              }}
+          )
+
+          foreach($step in $steps) {
+              Write-Host "│ 📋 $($step.Name)..." -NoNewline -ForegroundColor White
+              try {
+                  & $step.Script
+                  Write-Host "`r│ ✅ $($step.Name)" -ForegroundColor Green
+              } catch {
+                  Write-Host "`r│ ⚠️  $($step.Name) - Đã bỏ qua lỗi nhỏ" -ForegroundColor Yellow
+              }
+              Start-Sleep -Milliseconds 500
+          }
+
+          Write-Host "🎯 Cấu hình hoàn tất!" -ForegroundColor Green
+
+      - name: 👤 TẠO TÀI KHOẢN PREMIUM
+        run: |
+          Write-Host ""
+          Write-Host "👤 ĐANG TẠO TÀI KHOẢN PREMIUM" -ForegroundColor Yellow
+
+          $matKhau = "AAA@1234"
+          $securePass = ConvertTo-SecureString $matKhau -AsPlainText -Force
+
+          try {
+              Remove-LocalUser -Name "kienvnnn" -ErrorAction SilentlyContinue
+          } catch {}
+
+          try {
+              New-LocalUser -Name "kienvnnn" -Password $securePass -AccountNeverExpires -Description "Premium User"
+              Set-LocalUser -Name "kienvnnn" -PasswordNeverExpires $true
+
+              Add-LocalGroupMember -Group "Administrators" -Member "kienvnnn"
+              Add-LocalGroupMember -Group "Remote Desktop Users" -Member "kienvnnn"
+
+              Enable-LocalUser -Name "kienvnnn"
+
+              Write-Host "│ ✅ Đã tạo user kienvnnn" -ForegroundColor Green
+          } catch {
+              Write-Host "│ ❌ Lỗi tạo user: $($_.Exception.Message)" -ForegroundColor Red
+              exit 1
+          }
+
+          echo "RDP_USER=kienvnnn" >> $env:GITHUB_ENV
+          echo "RDP_PASS=$matKhau" >> $env:GITHUB_ENV
+          echo "$matKhau" > $env:TEMP\rdp_password.txt
+
+      - name: 🔍 KIỂM TRA QUYỀN HỆ THỐNG
+        run: |
+          $user = Get-LocalUser -Name "kienvnnn"
+          if (-not $user) { exit 1 }
+
+          $isAdmin = (Get-LocalGroupMember -Group "Administrators" | Where-Object {$_.Name -like "*kienvnnn"}).Count -gt 0
+          $isRDPUser = (Get-LocalGroupMember -Group "Remote Desktop Users" | Where-Object {$_.Name -like "*kienvnnn"}).Count -gt 0
+
+          Write-Host "User OK: kienvnnn"
+          Write-Host "Admin: $isAdmin"
+          Write-Host "RDP: $isRDPUser"
+
+      - name: 🌐 THIẾT LẬP MẠNG PREMIUM
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          $msiPath = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" -OutFile $msiPath
+
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$msiPath`"", "/quiet", "/norestart" -Wait
+
+          Start-Sleep -Seconds 10
+
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=$env:TAILSCALE_AUTH_KEY --reset
+
+          $ip = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+          echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV
+
+      - name: 🎉 THÔNG TIN KẾT NỐI
+        run: |
+          $pass = Get-Content $env:TEMP\rdp_password.txt
+          Write-Host "RDP: kienvnnn / $pass"
+          Write-Host "IP: $env:TAILSCALE_IP"
+          Write-Host "Port: 3389"
+
+      - name: ⏳ DUY TRÌ PHIÊN LÀM VIỆC
+        run: |
+          Start-Sleep -Seconds 18000
+
+      - name: 🧹 DỌN DẸP
+        if: always()
+        run: |
+          Disable-LocalUser -Name "kienvnnn" -ErrorAction SilentlyContinue
+          Remove-Item "$env:TEMP\rdp_password.txt" -ErrorAction SilentlyContinue
