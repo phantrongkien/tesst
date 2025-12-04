@@ -134,4 +134,4 @@ jobs:
           } catch {
             Write-Error "⚠️ EnigMano-GCRD-Instance.ps1 execution error: $($_.Exception.Message)"
             exit 1
-          }     thay thành win server 2025 hoặc 11
+          }     
